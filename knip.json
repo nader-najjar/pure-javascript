@@ -1,0 +1,14 @@
+{
+  "entry": [
+    "src/main/Main.ts",
+    "tools/*.mjs"
+  ],
+  "project": [
+    "src/**/*.ts",
+    "tools/**/*.ts",
+    "tools/**/*.mjs"
+  ],
+  "ignoreDependencies": [
+    "dependency-cruiser"
+  ]
+}

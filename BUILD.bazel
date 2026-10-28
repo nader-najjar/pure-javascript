@@ -1,0 +1,107 @@
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_library", "js_run_binary", "js_test")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@npm//:typescript/package_json.bzl", tsc_bin = "bin")
+load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
+load("@npm//:dependency-cruiser/package_json.bzl", depcruise_bin = "bin")
+
+package(default_visibility = ["//visibility:private"])
+npm_link_all_packages(name = "node_modules")
+
+js_library(
+    name = "app",
+    srcs = glob(["src/main/**/*.ts"]),
+    deps = [
+        ":node_modules/@aws-sdk/client-dynamodb",
+        ":node_modules/inversify",
+        ":node_modules/jsonc-parser",
+        ":node_modules/pino",
+        ":node_modules/reflect-metadata",
+        ":node_modules/zod",
+    ],
+)
+
+CHECK_DATA = [":app", ":node_modules", "package.json", "tsconfig.json", "tsconfig.build.json", "vitest.config.ts", "eslint.config.js", "knip.json"] + glob(["src/test/**/*.ts", "tools/*"])
+
+tsc_bin.tsc_test(name = "typecheck", data = CHECK_DATA, args = ["-p", "tsconfig.json"])
+eslint_bin.eslint_test(name = "lint", data = CHECK_DATA, args = ["--max-warnings", "0", "src", "tools", "vitest.config.ts", "eslint.config.js"])
+depcruise_bin.depcruise_test(name = "dependency_boundaries", data = CHECK_DATA + [".dependency-cruiser.json"], args = ["src"])
+
+tsc_bin.tsc_binary(name = "compiler", data = [":node_modules/typescript"], tags = ["manual"])
+js_run_binary(
+    name = "compile",
+    tool = ":compiler",
+    srcs = [":app", ":node_modules/@types/node", "package.json", "tsconfig.json", "tsconfig.build.json"],
+    args = ["-p", "tsconfig.build.json"],
+    out_dirs = ["build/compiled"],
+)
+
+js_test(
+    name = "unit_tests",
+    entry_point = "tools/run-check.mjs",
+    data = CHECK_DATA,
+    args = ["vitest", "run"],
+    size = "medium",
+)
+js_test(
+    name = "unused_code",
+    entry_point = "tools/run-check.mjs",
+    data = CHECK_DATA,
+    args = ["knip", "--no-progress"],
+)
+
+js_test(
+    name = "lockfile_consistency",
+    entry_point = "tools/check-lockfile.mjs",
+    data = [
+        "@pnpm//:pnpm",
+        ".npmrc",
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "tools/materialize.ts",
+    ],
+    args = ["$(rootpath @pnpm//:pnpm)"],
+)
+
+# Package only the production closure, preserving its relative dependency links.
+js_binary(
+    name = "package_executable",
+    entry_point = "tools/package-executable.mjs",
+    data = ["tools/materialize.ts", "tools/copy-runtime.ts"],
+    tags = ["manual"],
+)
+js_run_binary(
+    name = "executable",
+    tool = ":package_executable",
+    srcs = [
+        ":compile",
+        "package.json",
+        "LICENSE",
+        "README.md",
+        "pnpm-lock.yaml",
+        ":node_modules/@aws-sdk/client-dynamodb",
+        ":node_modules/inversify",
+        ":node_modules/jsonc-parser",
+        ":node_modules/pino",
+        ":node_modules/reflect-metadata",
+        ":node_modules/zod",
+    ],
+    out_dirs = ["executable"],
+)
+
+js_binary(
+    name = "print_node_and_tsdk_paths",
+    entry_point = "tools/print-toolchain.mjs",
+    data = [":node_modules/typescript", "@pnpm//:pkg"],
+    no_copy_to_bin = ["@pnpm//:pkg"],
+    args = ["$(rootpath @pnpm//:pkg)"],
+    patch_node_fs = False,
+    tags = ["manual"],
+)
+
+js_test(
+    name = "artifact_contract",
+    patch_node_fs = False,
+    entry_point = "tools/check-artifact.mjs",
+    data = [":executable", "tools/copy-runtime.ts"],
+)

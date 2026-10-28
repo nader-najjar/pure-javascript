@@ -1,0 +1,18 @@
+{
+  "forbidden": [
+    { "name": "no-circular", "severity": "error", "from": {}, "to": { "circular": true } },
+    { "name": "no-orphans", "severity": "error", "from": { "orphan": true, "pathNot": ["\\.d\\.ts$"] }, "to": {} },
+    { "name": "main-not-to-test", "severity": "error", "from": { "path": "^src/main" }, "to": { "path": "^src/test" } },
+    {
+      "name": "main-not-to-dev-dependencies",
+      "severity": "error",
+      "from": { "path": "^src/main" },
+      "to": { "dependencyTypes": ["npm-dev"], "dependencyTypesNot": ["type-only"] }
+    }
+  ],
+  "options": {
+    "doNotFollow": { "path": "node_modules" },
+    "tsConfig": { "fileName": "tsconfig.json" },
+    "tsPreCompilationDeps": true
+  }
+}

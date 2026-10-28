@@ -1,0 +1,5 @@
+common --enable_bzlmod
+common --repo_env=ASPECT_TOOLS_TELEMETRY=-all
+test --test_output=errors
+
+build --lockfile_mode=error

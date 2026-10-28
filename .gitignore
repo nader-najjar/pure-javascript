@@ -1,0 +1,9 @@
+.DS_Store
+.vscode
+.idea
+
+node_modules
+.pnpm-store/
+build
+
+bazel-*

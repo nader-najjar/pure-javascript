@@ -79,17 +79,19 @@ bazel run @pnpm//:pnpm -- --dir "$PWD" why <package>
 Prepare editor dependencies and print toolchain paths:
 
 ```sh
-bazel run //:print_node_and_tsdk_paths
+bazel build @rules_nodejs//nodejs:current_node_runtime @pnpm//:pkg //:node_modules/typescript
+bazel cquery 'set(@rules_nodejs//nodejs:current_node_runtime @pnpm//:pkg //:node_modules/typescript)' --output=files \
+  | sed "s|^|$(bazel info execution_root)/|"
 bazel run @pnpm//:pnpm -- --dir "$PWD" install --frozen-lockfile
 ```
 
 #### IntelliJ IDEA Ultimate
 
-Follow the [setup guide](https://app.notion.com/p/f4c0a2b7875583b79fa5015d58412fea). Use the printed `node` and pnpm `package` paths for JavaScript Runtime, and the printed TypeScript SDK directory for TypeScript. Enable Automatic ESLint.
+Follow the [setup guide](https://app.notion.com/p/f4c0a2b7875583b79fa5015d58412fea). Use the printed `node` and pnpm `package` paths for JavaScript Runtime, and the printed TypeScript package’s `lib` directory for TypeScript. Enable Automatic ESLint.
 
 #### Visual Studio Code
 
-Follow the [setup guide](https://app.notion.com/p/4fd0a2b787558204a6c001d0b034f698). Set `js/ts.tsserver.node.path` to the printed `node` and `js/ts.tsdk.path` to the printed TypeScript SDK directory; select **Use Workspace Version**.
+Follow the [setup guide](https://app.notion.com/p/4fd0a2b787558204a6c001d0b034f698). Set `js/ts.tsserver.node.path` to the printed `node` and `js/ts.tsdk.path` to the printed TypeScript package’s `lib` directory; select **Use Workspace Version**.
 
 Re-run the commands after toolchain changes or cache cleanup.
 

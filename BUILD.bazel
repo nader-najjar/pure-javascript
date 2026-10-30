@@ -1,3 +1,5 @@
+load("@rules_oci//oci:defs.bzl", "oci_image")
+load("@tar.bzl", "mutate", "tar")
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_library", "js_run_binary", "js_test")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@npm//:typescript/package_json.bzl", tsc_bin = "bin")
@@ -88,19 +90,38 @@ js_run_binary(
     out_dirs = ["executable"],
 )
 
-js_binary(
-    name = "print_node_and_tsdk_paths",
-    entry_point = "tools/print-toolchain.mjs",
-    data = [":node_modules/typescript", "@pnpm//:pkg"],
-    no_copy_to_bin = ["@pnpm//:pkg"],
-    args = ["$(rootpath @pnpm//:pkg)"],
-    patch_node_fs = False,
-    tags = ["manual"],
-)
-
 js_test(
     name = "artifact_contract",
     patch_node_fs = False,
     entry_point = "tools/check-artifact.mjs",
     data = [":executable", "tools/copy-runtime.ts"],
+)
+
+# Build on the native Linux/ARM64 release runner, after the checks pass.
+tar(
+    name = "release",
+    srcs = [":executable"],
+    mutate = mutate(
+        srcs = [":executable"],
+        preserve_symlinks = True,
+        strip_prefix = "executable",
+        package_dir = "custom-software/runtime-workspace/executable",
+        owner = "1000",
+        script_args = {"group": "1000"},
+        tags = ["manual"],
+    ),
+    tags = ["manual"],
+    target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:aarch64"],
+)
+
+oci_image(
+    name = "image",
+    tags = ["manual"],
+    base = "@node_linux_arm64_v8",
+    tars = ["artifacts/release.tar"],
+    workdir = "/custom-software/runtime-workspace/executable",
+    user = "1000:1000",
+    env = {"NODE_ENV": "production"},
+    entrypoint = ["node", "--enable-source-maps"],
+    cmd = ["/custom-software/runtime-workspace/executable/Main.js"],
 )

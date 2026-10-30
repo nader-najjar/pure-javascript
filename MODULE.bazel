@@ -2,6 +2,9 @@ module(name = "template_pure_javascript", version = "1.0.0")
 
 bazel_dep(name = "aspect_rules_js", version = "3.5.1")
 bazel_dep(name = "rules_nodejs", version = "6.7.7")
+bazel_dep(name = "rules_oci", version = "2.3.0")
+bazel_dep(name = "tar.bzl", version = "0.10.4")
+bazel_dep(name = "platforms", version = "1.1.0")
 
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
 node.toolchain(node_version = "24.22.1")
@@ -18,3 +21,12 @@ npm.npm_translate_lock(
     verify_node_modules_ignored = "//:.bazelignore",
 )
 use_repo(npm, "npm")
+
+oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
+oci.pull(
+    name = "node",
+    image = "docker.io/library/node",
+    digest = "sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c",
+    platforms = ["linux/arm64/v8"],
+)
+use_repo(oci, "node", "node_linux_arm64_v8")

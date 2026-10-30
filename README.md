@@ -47,7 +47,7 @@ bazel run @pnpm//:pnpm -- --dir "$PWD" add <package-name>@<version>
 bazel run @pnpm//:pnpm -- --dir "$PWD" update --latest
 ```
 
-After dependency changes, run `bazel mod deps --lockfile_mode=update`, then the full build and tests. Review and commit `package.json`, `pnpm-lock.yaml`, and `MODULE.bazel.lock` together. Add a new runtime dependency to both `app` and `executable` in `BUILD.bazel`, and extend the release import check in `tools/check-artifact.mjs`. Development dependencies belong only to check targets. Lifecycle scripts are denied by default through `onlyBuiltDependencies: []`; explicitly review any new native dependency before enabling its install script. If a lockfile needs repair, use `bazel run @pnpm//:pnpm -- --dir "$PWD" install --lockfile-only`.
+After dependency changes, run `bazel mod deps --lockfile_mode=update`, then the full build and tests. Review and commit `package.json`, `pnpm-lock.yaml`, and `MODULE.bazel.lock` together. Add a new runtime dependency to both `app` and `executable` in `BUILD.bazel`, and extend the release import check in `tools/check-artifact.mjs`. Development dependencies belong only to check targets. Dependency lifecycle scripts are denied through `pnpm.onlyBuiltDependencies: []` in `package.json`; explicitly review any new native dependency before enabling its install script. If a lockfile needs repair, use `bazel run @pnpm//:pnpm -- --dir "$PWD" install --lockfile-only`.
 
 ### Updating Toolchains
 

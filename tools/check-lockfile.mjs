@@ -9,7 +9,7 @@ const launcher = process.argv[2];
 if (launcher === undefined || launcher === '') throw new Error('The pinned pnpm launcher is required.');
 const root = mkdtempSync(join(tmpdir(), 'pure-javascript-lock-'));
 try {
-  for (const input of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc']) {
+  for (const input of ['package.json', 'pnpm-lock.yaml', '.npmrc']) {
     materialize(resolve(input), join(root, input));
   }
   const result = spawnSync(resolve(launcher), [

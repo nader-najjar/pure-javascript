@@ -114,14 +114,21 @@ tar(
     target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:aarch64"],
 )
 
+tar(
+    name = "node_runtime",
+    srcs = ["@nodejs_linux_arm64//:node_bin"],
+    mtree = ["usr/local/bin/node type=file mode=0755 uid=0 gid=0 time=0 content=$(execpath @nodejs_linux_arm64//:node_bin)"],
+    tags = ["manual"],
+)
+
 oci_image(
     name = "image",
     tags = ["manual"],
-    base = "@node_linux_arm64_v8",
-    tars = ["artifacts/release.tar"],
+    base = "@debian_linux_arm64_v8",
+    tars = [":node_runtime", "artifacts/release.tar"],
     workdir = "/custom-software/runtime-workspace/executable",
     user = "1000:1000",
     env = {"NODE_ENV": "production"},
-    entrypoint = ["node", "--enable-source-maps"],
+    entrypoint = ["/usr/local/bin/node", "--enable-source-maps"],
     cmd = ["/custom-software/runtime-workspace/executable/Main.js"],
 )

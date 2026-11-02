@@ -1,0 +1,40 @@
+name: Linux container startup
+
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: cachix/install-nix-action@d9186cbdca7adedf113a159fa91f725a27866771
+      - name: Build release
+        run: ./universal-build build
+      - name: Build container
+        run: |
+          mkdir "$RUNNER_TEMP/release"
+          tar -xzf build/release-artifact.tar.gz -C "$RUNNER_TEMP/release"
+          docker build -t pure-javascript-smoke "$RUNNER_TEMP/release"
+      - name: Verify application startup
+        shell: bash
+        run: |
+          set +e
+          timeout 60s docker run --rm --network none \
+            -e STAGE=ALPHA \
+            -e AWS_REGION=us-east-1 \
+            -e AWS_EC2_METADATA_DISABLED=true \
+            -e CALCULATION_RESULTS_TABLE_NAME=smoke \
+            -e EXAMPLE_STRING_VAR=smoke \
+            -e EXAMPLE_INT_VAR=1 \
+            -e EXAMPLE_BOOLEAN_VAR=true \
+            pure-javascript-smoke '[' > "$RUNNER_TEMP/startup.log" 2>&1
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/startup.log"
+          test "$status" -eq 1
+          jq -s -e 'any(.[]; .loggerName == "Executor" and (.message | startswith("Executing with stage:")))' "$RUNNER_TEMP/startup.log"
+          jq -s -e 'any(.[]; .loggerName == "Main" and (.err.message | startswith("Invalid input JSON")))' "$RUNNER_TEMP/startup.log"

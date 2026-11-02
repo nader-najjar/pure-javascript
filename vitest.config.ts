@@ -10,14 +10,15 @@ export default defineConfig({
     unstubEnvs: true,
     unstubGlobals: true,
     passWithNoTests: false,
+    allowOnly: false,
     reporters: ['default', 'junit'],
-    outputFile: { junit: 'build/test-results/junit.xml' },
+    outputFile: { junit: 'build/quality-reports/tests/junit.xml' },
     coverage: {
       enabled: true,
       provider: 'v8',
       include: ['src/main/**/*.ts'],
       exclude: ['src/main/Main.ts', 'src/main/composition/**'],
-      reportsDirectory: 'build/coverage',
+      reportsDirectory: 'build/quality-reports/coverage',
       reporter: ['text', 'html', 'lcov'],
       thresholds: { statements: 80, branches: 80, functions: 80, lines: 80 }
     }

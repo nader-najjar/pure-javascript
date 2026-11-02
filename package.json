@@ -1,19 +1,14 @@
 {
-  "name": "template-pure-javascript",
-  "version": "1.0.0",
+  "name": "pure-javascript",
   "private": true,
   "type": "module",
-  "files": [
-    "build/compiled"
-  ],
+  "files": [],
   "scripts": {
-    "clean": "rm -rf node_modules build && pnpm run printSuccess",
-    "build": "pnpm install --frozen-lockfile && pnpm run check && pnpm run compile && pnpm run test && pnpm run packageExecutable && pnpm run printSuccess",
+    "build": "pnpm install --frozen-lockfile && pnpm run check && pnpm run test && pnpm run package-dependencies && pnpm run compile",
     "check": "tsc -p tsconfig.json && eslint --max-warnings 0 . && depcruise src && knip",
     "test": "vitest run",
-    "printSuccess": "printf '\\033[0;32mBUILD SUCCEEDED\\033[0m\n'",
-    "compile": "rm -rf build/compiled build/release/executable && tsc -p tsconfig.build.json",
-    "packageExecutable": "pnpm --filter . deploy --prod --offline build/release/executable && cd build/release/executable && mv build/compiled/* . && rm -rf build"
+    "package-dependencies": "rm -rf build/release/idiomatic-artifacts && pnpm --filter . deploy --prod --offline build/release/idiomatic-artifacts",
+    "compile": "tsc -p tsconfig.build.json"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

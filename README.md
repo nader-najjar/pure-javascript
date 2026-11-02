@@ -1,4 +1,4 @@
-# pure-javascript-legacy
+# pure-javascript
 
 > JavaScript best practices.
 
@@ -7,46 +7,72 @@
 ---
 
 - macOS or Linux on ARM64 or x86-64, as configured in `flake.nix`.
-- Install [Nix](https://nix.dev/install-nix); it supplies Node and pnpm.
+- Install [Nix](https://nix.dev/install-nix).
+- Windows: run `wsl --install` in administrator PowerShell; after restarting and completing Linux user setup, run `wsl -- bash -lc "<INSTALL_INSTRUCTION_HERE>"` and follow the [Nix Windows (WSL2) installation instructions](https://nix.dev/install-nix) to populate the placeholder.
+- Network access for uncached toolchains and dependencies.
 
-Run commands from the repository root. Install locked dependencies before individual tasks:
+Run the commands below from the repository root.
 
-```sh
-./universal-build install --frozen-lockfile
-```
+Optional shortcut: configure `ub` as an alias for `./universal-build`:
+
+- Zsh/Bash: add `alias ub='./universal-build'` to `~/.zshrc` or `~/.bashrc`.
+- Windows PowerShell: add `function ub { wsl -- bash -lc 'exec ./universal-build "$@"' ub @args }` to `$PROFILE` (uses the default WSL distribution with Nix installed).
+
+Restart your terminal after saving.
 
 ### 2. Build and Test
 
 ---
 
+#### Universal Build Contract
+
+Universal Build expects:
+
+- `universal-build` at the project root.
+- Any version of Nix on `PATH`.
+- `flake.nix` at the project root.
+- `flake.lock` at the project root, except for `clean` and initial `update-toolchain-lock`.
+- A flake input named `nixpkgs`.
+- A development shell named `buildtime`.
+- `buildtime.BUILD_COMMAND` must contain the shell command to run for `build`.
+- `BUILD_COMMAND` must resolve dependencies and enforce dependency locks.
+- `BUILD_COMMAND` must compile the application as needed.
+- `BUILD_COMMAND` must run tests and checks.
+- `BUILD_COMMAND` must stage all deployable files to `build/release/idiomatic-artifacts/`.
+- `buildtime.RELEASE_TYPE` set to `container` or `static`.
+- `buildtime.UPDATE_IDIOMATIC_LOCK_COMMAND` must contain the shell command to refresh dependency locks for `update-idiomatic-lock`.
+- `buildtime.IDE_PATH_VARS` listing space-separated environment variable names for `ide-paths`.
+- Each variable listed in `IDE_PATH_VARS` to be defined in `buildtime`.
+- A root `Dockerfile` for container releases.
+- A flake package named `runtime` for container releases.
+- The runtime package to provide executable named `ignite`.
+- The runtime package to include all runtime dependencies and environment variables.
+- `ignite` to accept the idiomatic artifacts directory as its first argument.
+- `ignite` to execute the software's main() entrypoint based on the language being used.
+
+For `build`, Universal Build recreates `build/release/` and archives its contents as `build/release-artifact.tar.gz`:
+
+- `idiomatic-artifacts/`.
+- `Dockerfile` for container releases.
+- `runtime-artifacts/` for container releases.
+- `symlink-to-absolute-ignite-script` pointing to the runtime package for container releases.
+
 #### Everyday Commands
 
 | Goal | Command |
 | --- | --- |
-| Compile only | `./universal-build run compile` |
-| Unit tests with coverage | `./universal-build run test` |
-| Type check | `./universal-build exec tsc -p tsconfig.json` |
-| Lint | `./universal-build exec eslint --max-warnings 0 .` |
-| All static checks | `./universal-build run check` |
-| Assemble production package | `./universal-build run compile && ./universal-build run packageExecutable` |
-| Full verification and packaging | `./universal-build build` |
-| Remove build outputs and installed dependencies | `./universal-build clean` |
-
-Tests run TypeScript directly and enforce 80% coverage. `check` includes types, lint, dependency boundaries, and unused code. `compile` deletes the previous compiled output and production package; `packageExecutable` requires compiled output and dependencies already in the pnpm store.
-
-Run one test file, or one named test, without the whole-project coverage gate:
-
-```sh
-./universal-build run test src/test/samplebusinesslayer/Calculator.test.ts --coverage.enabled=false
-./universal-build run test src/test/samplebusinesslayer/Calculator.test.ts -t 'throws on division by zero' --coverage.enabled=false
-```
+| Build, test, check, and package | `./universal-build build` |
+| Remove build outputs | `./universal-build clean` |
+| Print IDE toolchain paths | `./universal-build ide-paths` |
+| Update toolchain lock | `./universal-build update-toolchain-lock` |
+| Refresh application dependency locks | `./universal-build update-idiomatic-lock` |
 
 #### Outputs
 
-- Compiled JavaScript: `build/compiled/`.
-- Production package: `build/release/executable/`.
-- JUnit: `build/test-results/junit.xml`.
-- Coverage: `build/coverage/index.html` and `build/coverage/lcov.info`.
+- Test results: `build/quality-reports/tests/junit.xml`.
+- Coverage: `build/quality-reports/coverage/index.html` and `build/quality-reports/coverage/lcov.info`.
+- Runnable application and dependencies: `build/release/idiomatic-artifacts/`.
+- Release archive: `build/release-artifact.tar.gz`.
 
 ### 3. Development Workflows
 
@@ -54,47 +80,55 @@ Run one test file, or one named test, without the whole-project coverage gate:
 
 #### Dependency Management
 
-Use pnpm through the wrapper to update `package.json` and `pnpm-lock.yaml`; `-w` selects this workspace root:
+Edit `package.json`:
+
+- Add: declare the package and version in `dependencies` or `devDependencies` (see appendix).
+- Remove: delete the declaration and its usages.
+- Upgrade/pin: change the version or version range.
+
+Refresh locks after adding, removing, or updating dependencies:
 
 ```sh
-./universal-build add -w <package>
-./universal-build add -w -D <package>
-./universal-build add -w -E <package>@<version>
-./universal-build remove <package>
-./universal-build update <package> --latest
+./universal-build update-idiomatic-lock
 ```
-
-- Refresh the lockfile: `./universal-build install --lockfile-only`.
-- Trace a dependency/version conflict: `./universal-build why <package>`.
-- Build and test; commit `package.json` and `pnpm-lock.yaml` together.
 
 #### Toolchain Changes
 
-- Node and pnpm: `chosenNode` and `chosenPnpm` in `flake.nix`. Review `@types/node` and TypeScript configuration when upgrading Node.
-- Other CLI tools: the development shell's `packages` in `flake.nix`.
-- Nix package set: change `inputs.nixpkgs.url`, then run `./universal-build --update-nix-flake-lockfile`. Commit `flake.nix` and `flake.lock`.
+| Change | Files and steps |
+| --- | --- |
+| Node version | Change `chosenNode` in both the buildtime shell and runtime package in `flake.nix`. Review `@types/node` and TypeScript configuration together. |
+| Add a CLI tool | Add its Nix package to the development shell's `packages` in `flake.nix`. |
+| Nix package set | Change `inputs.nixpkgs.url` in `flake.nix`, then run `./universal-build update-toolchain-lock`. Review and commit `flake.nix` and `flake.lock`. |
+| pnpm version | Change `chosenPnpm` in `flake.nix`; `flake.lock` pins the exact release. |
 
-After toolchain changes, run the full build and refresh the IDE paths.
+After toolchain changes, run `./universal-build build`, then run `./universal-build ide-paths` and update the IDE's Node and pnpm paths.
 
 ### 4. IDE Setup
 
 ---
 
-After installing dependencies, print the pinned toolchain paths:
+Print the pinned Node and pnpm locations:
 
 ```sh
-./universal-build --print-node-and-tsdk-paths-for-ide
+./universal-build ide-paths
 ```
 
-- [IntelliJ IDEA Ultimate setup](https://app.notion.com/p/f4c0a2b7875583b79fa5015d58412fea): use the printed Node/pnpm paths for JavaScript Runtime and the TypeScript SDK path for TypeScript. Enable Automatic ESLint.
-- [Visual Studio Code setup](https://app.notion.com/p/4fd0a2b787558204a6c001d0b034f698): set `js/ts.tsserver.node.path` and `js/ts.tsdk.path` to the printed Node and SDK paths; select **Use Workspace Version**.
+Use `NODE_BINARY` for Node and `PNPM_BINARY` for pnpm. The TypeScript SDK becomes available after the first `./universal-build build`, at the repository's `node_modules/typescript/lib` directory; use its absolute path.
+
+Configure your IDE using these paths:
+
+- [IntelliJ IDEA Ultimate setup](https://app.notion.com/p/f4c0a2b7875583b79fa5015d58412fea)
+- [Visual Studio Code setup](https://app.notion.com/p/4fd0a2b787558204a6c001d0b034f698)
+
+Reprint the toolchain paths after Nix/toolchain changes.
 
 ### 5. Concepts
 
 ---
 
-- [Nix flakes](https://nix.dev/concepts/flakes)
-- [pnpm dependency management](https://pnpm.io/10.x/package_json)
+- [Product Release Pipelines Across Repositories](https://app.notion.com/p/3f90a2b7875581ef953bca201941e0dd)
+- [Deployment Testing and Promotion](https://app.notion.com/p/3f90a2b7875581de812ffaddc1e44b83)
+- [Shutdown Concepts](https://app.notion.com/p/4080a2b78755818a93b6c7ffa13a809d)
 
 ### 6. Appendix
 
@@ -102,14 +136,14 @@ After installing dependencies, print the pinned toolchain paths:
 
 #### Dependency Declarations
 
-| `package.json` field | pnpm add flag | Use |
-| --- | --- | --- |
-| `dependencies` | Default | Runtime dependencies |
-| `devDependencies` | `-D` | Build, test, and editor tools |
-| `optionalDependencies` | `-O` | Dependencies whose installation may fail |
-| `peerDependencies` | `--save-peer` | Host-provided compatibility contract; also installs as a dev dependency |
+| `package.json` field | Use |
+| --- | --- |
+| `dependencies` | Runtime dependencies |
+| `devDependencies` | Build, test, and editor tools |
+| `optionalDependencies` | Dependencies whose installation may fail |
+| `peerDependencies` | Compatibility requirements for a consuming application's dependencies |
 
-`-E` saves an exact version instead of a range. See [pnpm add](https://pnpm.io/10.x/cli/add) for other dependency specifiers.
+Reference: [pnpm package.json](https://pnpm.io/10.x/package_json).
 
 ### License
 

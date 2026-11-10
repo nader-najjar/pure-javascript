@@ -40,7 +40,7 @@
         in
         {
           runtime = pkgs.writeShellApplication {
-            name = "ignite";
+            name = "execute";
             runtimeInputs = [ pkgs.nodejs_24 ];
             runtimeEnv.NODE_ENV = "production";
             text = ''
